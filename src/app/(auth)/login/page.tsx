@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -19,9 +19,18 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-export default function LoginPage() {
-  const router = useRouter();
+function RegisteredBanner() {
   const params = useSearchParams();
+  if (!params.get("registered")) return null;
+  return (
+    <div className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
+      ¡Cuenta creada! Inicia sesión para continuar.
+    </div>
+  );
+}
+
+function LoginForm() {
+  const router = useRouter();
   const [showPass, setShowPass] = useState(false);
 
   const {
@@ -48,6 +57,53 @@ export default function LoginPage() {
   };
 
   return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="email">Correo electrónico</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="email"
+            type="email"
+            placeholder="conductor@email.com"
+            className="pl-9"
+            {...register("email")}
+          />
+        </div>
+        {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="password">Contraseña</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="password"
+            type={showPass ? "text" : "password"}
+            placeholder="••••••••"
+            className="pl-9 pr-9"
+            {...register("password")}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPass(!showPass)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+      </div>
+
+      <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
+        Iniciar sesión
+      </Button>
+    </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
     <div className="animate-fade-in">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-900 mb-1">Iniciar sesión</h1>
@@ -59,54 +115,11 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {params.get("registered") && (
-        <div className="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm text-emerald-700">
-          ¡Cuenta creada! Inicia sesión para continuar.
-        </div>
-      )}
+      <Suspense fallback={null}>
+        <RegisteredBanner />
+      </Suspense>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Correo electrónico</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="email"
-              type="email"
-              placeholder="conductor@email.com"
-              className="pl-9"
-              {...register("email")}
-            />
-          </div>
-          {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Contraseña</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="password"
-              type={showPass ? "text" : "password"}
-              placeholder="••••••••"
-              className="pl-9 pr-9"
-              {...register("password")}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPass(!showPass)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-        </div>
-
-        <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
-          Iniciar sesión
-        </Button>
-      </form>
+      <LoginForm />
     </div>
   );
 }
