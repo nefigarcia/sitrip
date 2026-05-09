@@ -1,0 +1,7 @@
+{
+  "/(dashboard)/trips/[id]/page": "app/(dashboard)/trips/[id]/page.js",
+  "/(dashboard)/requests/page": "app/(dashboard)/requests/page.js",
+  "/(dashboard)/requests/new/page": "app/(dashboard)/requests/new/page.js",
+  "/(dashboard)/trips/new/page": "app/(dashboard)/trips/new/page.js",
+  "/(dashboard)/trips/page": "app/(dashboard)/trips/page.js"
+}

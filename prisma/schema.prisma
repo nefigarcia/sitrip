@@ -1,0 +1,242 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  avatar    String?
+  bio       String?  @db.Text
+  role      UserRole @default(BOTH)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vehicle      Vehicle?
+  tripsAsDriver Trip[]       @relation("DriverTrips")
+  bookings      Booking[]
+  tripRequests  TripRequest[]
+  offers        Offer[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  DRIVER
+  PASSENGER
+  BOTH
+}
+
+model Vehicle {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  brand          String
+  model          String
+  year           Int
+  color          String?
+  licensePlate   String?
+  fuelEfficiency Float
+  fuelType       FuelType @default(GASOLINE)
+  capacity       Int      @default(4)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("vehicles")
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  HYBRID
+  ELECTRIC
+}
+
+model Trip {
+  id                String     @id @default(cuid())
+  driverId          String
+  title             String
+  description       String?    @db.Text
+  status            TripStatus @default(DRAFT)
+  startDate         DateTime
+  endDate           DateTime
+  totalDistance     Float?
+  totalFuel         Float?
+  totalTolls        Float?
+  totalExtras       Float?
+  profitMargin      Float      @default(20)
+  pricePerPassenger Float?
+  maxPassengers     Int        @default(1)
+  currentPassengers Int        @default(0)
+  fuelPrice         Float      @default(23.5)
+  tripType          TripType   @default(EXPRESS)
+  driverDailyRate   Float?
+  isPublic          Boolean    @default(false)
+  notes             String?    @db.Text
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  driver   User       @relation("DriverTrips", fields: [driverId], references: [id])
+  stops    TripStop[]
+  expenses Expense[]
+  bookings Booking[]
+
+  @@map("trips")
+}
+
+enum TripType {
+  EXPRESS
+  MULTI_DAY
+}
+
+enum TripStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model TripStop {
+  id             String    @id @default(cuid())
+  tripId         String
+  order          Int
+  name           String
+  address        String?
+  city           String
+  state          String?
+  lat            Float?
+  lng            Float?
+  arrivalDate    DateTime?
+  departureDate  DateTime?
+  notes          String?   @db.Text
+  distanceToNext Float?
+  durationToNext Int?
+  tollToNext     Float?
+  createdAt      DateTime  @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("trip_stops")
+}
+
+model Expense {
+  id          String      @id @default(cuid())
+  tripId      String
+  type        ExpenseType
+  description String?
+  amount      Float
+  isAutomatic Boolean     @default(false)
+  fromStop    Int?
+  toStop      Int?
+  createdAt   DateTime    @default(now())
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@map("expenses")
+}
+
+enum ExpenseType {
+  FUEL
+  TOLL
+  FOOD
+  HOTEL
+  PARKING
+  MAINTENANCE
+  OTHER
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  tripId       String
+  passengerId  String
+  status       BookingStatus @default(PENDING)
+  passengers   Int           @default(1)
+  totalAmount  Float?
+  notes        String?       @db.Text
+  contactPhone String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  trip      Trip @relation(fields: [tripId], references: [id])
+  passenger User @relation(fields: [passengerId], references: [id])
+
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model TripRequest {
+  id          String          @id @default(cuid())
+  passengerId String
+  title       String
+  description String?         @db.Text
+  tripType    TripRequestType @default(EXPRESS)
+  origin      String
+  originLat   Float?
+  originLng   Float?
+  destination String
+  destLat     Float?
+  destLng     Float?
+  waypoints   String?         @db.Text
+  startDate   DateTime
+  endDate     DateTime?
+  totalDays   Int?
+  passengers  Int             @default(1)
+  budget      Float?
+  status      RequestStatus   @default(OPEN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  passenger User    @relation(fields: [passengerId], references: [id])
+  offers    Offer[]
+
+  @@map("trip_requests")
+}
+
+enum TripRequestType {
+  EXPRESS
+  MULTI_DAY
+}
+
+enum RequestStatus {
+  OPEN
+  ACCEPTED
+  CANCELLED
+  COMPLETED
+}
+
+model Offer {
+  id        String      @id @default(cuid())
+  requestId String
+  driverId  String
+  amount    Float
+  message   String?     @db.Text
+  status    OfferStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  request TripRequest @relation(fields: [requestId], references: [id])
+  driver  User        @relation(fields: [driverId], references: [id])
+
+  @@map("offers")
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
