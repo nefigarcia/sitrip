@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { MapPin, Calendar, Users, DollarSign, ArrowRight, Phone, CheckCircle2, XCircle, Car } from "lucide-react";
+import { MapPin, Users, DollarSign, ArrowRight, Phone, CheckCircle2, XCircle, Car, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency, formatDate, requestStatusLabel, getInitials, fuelTypeLabel } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 
 const offerStatusColors: Record<string, any> = {
   PENDING: "warning",
@@ -28,9 +29,11 @@ interface RequestDetailProps {
 
 export function RequestDetailView({ request, isOwner, hasOffer, userId }: RequestDetailProps) {
   const router = useRouter();
-  const [offerAmount, setOfferAmount] = useState("");
+  const [offerAmount, setOfferAmount]   = useState("");
   const [offerMessage, setOfferMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [cancelOpen, setCancelOpen]     = useState(false);
+  const [cancelling, setCancelling]     = useState(false);
 
   const handleOffer = async () => {
     if (!offerAmount) { toast.error("Ingresa un monto"); return; }
@@ -48,6 +51,23 @@ export function RequestDetailView({ request, isOwner, hasOffer, userId }: Reques
       toast.error(err.error ?? "Error al enviar oferta");
     }
     setLoading(false);
+  };
+
+  const handleCancelRequest = async () => {
+    setCancelling(true);
+    const res = await fetch(`/api/requests/${request.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "CANCELLED" }),
+    });
+    setCancelling(false);
+    setCancelOpen(false);
+    if (res.ok) {
+      toast.success("Solicitud cancelada");
+      router.refresh();
+    } else {
+      toast.error("Error al cancelar la solicitud");
+    }
   };
 
   const handleOfferStatus = async (offerId: string, status: string) => {
@@ -70,10 +90,24 @@ export function RequestDetailView({ request, isOwner, hasOffer, userId }: Reques
               {requestStatusLabel(request.status)}
             </Badge>
           </div>
-          {request.description && (
-            <p className="text-sm text-muted-foreground">{request.description}</p>
-          )}
         </div>
+
+        {/* Cancelar solicitud — solo dueño y si está abierta */}
+        {isOwner && request.status === "OPEN" && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive border-destructive hover:bg-destructive/10 shrink-0"
+            onClick={() => setCancelOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Retirar solicitud
+          </Button>
+        )}
+
+        {request.description && (
+          <p className="text-sm text-muted-foreground w-full">{request.description}</p>
+        )}
       </div>
 
       {/* Details */}
@@ -257,6 +291,22 @@ export function RequestDetailView({ request, isOwner, hasOffer, userId }: Reques
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="¿Retirar esta solicitud?"
+        description="La solicitud pasará a estado Cancelado y las ofertas pendientes de conductores serán rechazadas."
+        confirmLabel="Sí, retirar solicitud"
+        variant="warning"
+        loading={cancelling}
+        onConfirm={handleCancelRequest}
+        details={
+          request.offers?.filter((o: any) => o.status === "PENDING").length > 0
+            ? [`Hay ${request.offers.filter((o: any) => o.status === "PENDING").length} oferta(s) pendiente(s) que serán rechazadas.`]
+            : undefined
+        }
+      />
     </div>
   );
 }

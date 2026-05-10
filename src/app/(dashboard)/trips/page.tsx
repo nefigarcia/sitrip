@@ -52,7 +52,7 @@ export default async function TripsPage() {
             </div>
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {trips.map((trip) => (
-                <TripCard key={trip.id} trip={trip} />
+                <TripCard key={trip.id} trip={trip} isOwner />
               ))}
             </div>
           </>

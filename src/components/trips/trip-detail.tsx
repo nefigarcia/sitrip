@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   MapPin, Users, Calendar, Fuel, Landmark, Globe, GlobeLock,
-  CheckCircle2, XCircle, Clock, Phone, Mail, ArrowRight,
-  Edit, Trash2, UserCheck, BadgeCheck,
+  CheckCircle2, XCircle, Clock, Phone, ArrowRight,
+  Trash2, UserCheck, BadgeCheck,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import {
   formatCurrency, formatDateTime, tripStatusLabel,
   bookingStatusLabel, expenseTypeLabel, getInitials,
@@ -60,12 +61,14 @@ interface Trip {
 
 export function TripDetail({ trip, isOwner, userId }: { trip: Trip; isOwner: boolean; userId: string }) {
   const router = useRouter();
-  const [bookingOpen, setBookingOpen] = useState(false);
+  const [bookingOpen, setBookingOpen]   = useState(false);
   const [bookPassengers, setBookPassengers] = useState(1);
-  const [bookNotes, setBookNotes] = useState("");
-  const [bookPhone, setBookPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [bookNotes, setBookNotes]       = useState("");
+  const [bookPhone, setBookPhone]       = useState("");
+  const [loading, setLoading]           = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
+  const [deleteOpen, setDeleteOpen]     = useState(false);
+  const [deleting, setDeleting]         = useState(false);
 
   const subtotal = (trip.totalFuel ?? 0) + (trip.totalTolls ?? 0) + (trip.totalExtras ?? 0);
   const profitAmt = subtotal * (trip.profitMargin / 100);
@@ -111,6 +114,20 @@ export function TripDetail({ trip, isOwner, userId }: { trip: Trip; isOwner: boo
       toast.error(err.error ?? "Error al reservar");
     }
     setLoading(false);
+  };
+
+  const handleDeleteTrip = async () => {
+    setDeleting(true);
+    const res = await fetch(`/api/trips/${trip.id}`, { method: "DELETE" });
+    setDeleting(false);
+    setDeleteOpen(false);
+    if (res.ok) {
+      const data = await res.json();
+      toast.success(data.deleted ? "Viaje eliminado" : "Viaje cancelado");
+      router.push("/trips");
+    } else {
+      toast.error("Error al eliminar el viaje");
+    }
   };
 
   const handleBookingStatus = async (bookingId: string, status: string) => {
@@ -161,10 +178,23 @@ export function TripDetail({ trip, isOwner, userId }: { trip: Trip; isOwner: boo
                 Completar
               </Button>
             )}
-            <Button size="sm" variant={trip.isPublic ? "outline" : "outline"} onClick={handlePublish} loading={statusLoading}>
-              {trip.isPublic ? <GlobeLock className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
-              {trip.isPublic ? "Quitar de público" : "Hacer público"}
-            </Button>
+            {trip.status !== "CANCELLED" && trip.status !== "COMPLETED" && (
+              <Button size="sm" variant="outline" onClick={handlePublish} loading={statusLoading}>
+                {trip.isPublic ? <GlobeLock className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
+                {trip.isPublic ? "Quitar de público" : "Hacer público"}
+              </Button>
+            )}
+            {trip.status !== "COMPLETED" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-destructive border-destructive hover:bg-destructive/10"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                {trip.status === "DRAFT" ? "Eliminar" : "Cancelar"}
+              </Button>
+            )}
           </div>
         )}
 
@@ -357,6 +387,30 @@ export function TripDetail({ trip, isOwner, userId }: { trip: Trip; isOwner: boo
           </CardContent>
         </Card>
       )}
+
+      {/* ConfirmDialog — eliminar/cancelar viaje */}
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={trip.status === "DRAFT" ? "¿Eliminar este viaje?" : "¿Cancelar este viaje?"}
+        description={
+          trip.status === "DRAFT"
+            ? "Esta acción eliminará el viaje permanentemente."
+            : "El viaje pasará a estado Cancelado y las reservas activas serán canceladas automáticamente."
+        }
+        confirmLabel={trip.status === "DRAFT" ? "Sí, eliminar" : "Sí, cancelar viaje"}
+        variant="destructive"
+        loading={deleting}
+        onConfirm={handleDeleteTrip}
+        details={
+          trip.bookings.filter((b: any) => ["PENDING", "CONFIRMED"].includes(b.status)).length > 0
+            ? [
+                `Hay ${trip.bookings.filter((b: any) => ["PENDING", "CONFIRMED"].includes(b.status)).length} reserva(s) activa(s).`,
+                "Las reservas pendientes y confirmadas se cancelarán automáticamente.",
+              ]
+            : undefined
+        }
+      />
 
       {/* Booking dialog */}
       <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
